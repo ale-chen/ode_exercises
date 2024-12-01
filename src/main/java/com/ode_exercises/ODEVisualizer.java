@@ -3,46 +3,68 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.*;
 import java.awt.event.*;
-import javax.swing.Timer;
 import java.util.ArrayList;
 
-public class ODEVisualizer extends JFrame {
-    public ODEVisualizer(double[] x, double[] y, double[] z) {
+public class ODEVisualizer {
+    // Static wrapper methods for backwards compatibility
+    public static void visualize(double[] x, double[] y, double[] z) {
+        ArrayList<ArrayList<double[]>> trajectories = new ArrayList<>();
+        ArrayList<double[]> singleTrajectory = new ArrayList<>();
+        singleTrajectory.add(x);
+        singleTrajectory.add(y);
+        singleTrajectory.add(z);
+        trajectories.add(singleTrajectory);
+        MultiParticleVisualizer.visualize(trajectories);
+    }
+}
+
+class MultiParticleVisualizer extends JFrame {
+    public MultiParticleVisualizer(ArrayList<ArrayList<double[]>> trajectories) {
         setTitle("3D ODE Visualization");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        add(new Plot3DPanel(x, y, z));
+        add(new Plot3DPanel(trajectories));
     }
 
-    public static void visualize(double[] x, double[] y, double[] z) {
+    public static void visualize(ArrayList<ArrayList<double[]>> trajectories) {
         SwingUtilities.invokeLater(() -> {
-            new ODEVisualizer(x, y, z).setVisible(true);
+            new MultiParticleVisualizer(trajectories).setVisible(true);
         });
+    }
+
+    static class Point3D {
+        double x, y, z;
+        public Point3D(double x, double y, double z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
     }
 
     class Plot3DPanel extends JPanel implements MouseListener, MouseMotionListener, MouseWheelListener {
         private int currentIndex = 0;
-        private ArrayList<Point3D> trajectory = new ArrayList<>();
+        private ArrayList<ArrayList<Point3D>> trajectories = new ArrayList<>();
         private Timer timer;
         private double rotationX = 0;
         private double rotationY = 0;
-        private double scale = 200;  // Modified to be instance variable for zoom
+        private double scale = 200;
         private Point lastMousePos;
-        private double[] x, y, z;
+        private ArrayList<ArrayList<double[]>> inputTrajectories;
         private boolean isPaused = false;
-        private JPanel drawingPanel;  // Separate panel for drawing
+        private JPanel drawingPanel;
+        private double speedMultiplier = 1.0;
+        private boolean showAxes = true;
+        private boolean showGrid = true;
 
-        public Plot3DPanel(double[] x, double[] y, double[] z) {
-            if (x.length != y.length || y.length != z.length) {
-                throw new IllegalArgumentException("Arrays must have same length");
+        public Plot3DPanel(ArrayList<ArrayList<double[]>> inputTrajectories) {
+            this.inputTrajectories = inputTrajectories;
+            
+            for (int i = 0; i < inputTrajectories.size(); i++) {
+                trajectories.add(new ArrayList<>());
             }
-            this.x = x;
-            this.y = y;
-            this.z = z;
             
             setLayout(new BorderLayout());
 
-            // Create drawing panel
             drawingPanel = new JPanel() {
                 @Override
                 protected void paintComponent(Graphics g) {
@@ -55,37 +77,83 @@ public class ODEVisualizer extends JFrame {
             drawingPanel.addMouseWheelListener(this);
             drawingPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-            // Create control panel
             JPanel controlPanel = new JPanel();
             JButton resetButton = new JButton("Reset");
             JButton pauseButton = new JButton("Pause");
+            JButton toggleAxesButton = new JButton("Toggle Axes");
+            JButton toggleGridButton = new JButton("Toggle Grid");
             
-            resetButton.addActionListener(e -> resetVisualization());
+            JSlider speedSlider = new JSlider(JSlider.HORIZONTAL, 1, 500, 100);
+            speedSlider.addChangeListener(e -> {
+                speedMultiplier = speedSlider.getValue() / 100.0;
+            });
+        
+            resetButton.addActionListener(e -> {
+                resetVisualization();
+                pauseButton.setText("Pause");  // Reset button text too
+            });
+            
             pauseButton.addActionListener(e -> {
                 isPaused = !isPaused;
                 pauseButton.setText(isPaused ? "Play" : "Pause");
             });
+        
+            toggleAxesButton.addActionListener(e -> {
+                showAxes = !showAxes;
+                drawingPanel.repaint();
+            });
+        
+            toggleGridButton.addActionListener(e -> {
+                showGrid = !showGrid;
+                drawingPanel.repaint();
+            });
+            
+            JPanel sliderPanel = new JPanel(new BorderLayout());
+            sliderPanel.add(new JLabel("Speed: "), BorderLayout.WEST);
+            sliderPanel.add(speedSlider, BorderLayout.CENTER);
             
             controlPanel.add(resetButton);
             controlPanel.add(pauseButton);
-
-            // Add panels to main panel
+            controlPanel.add(toggleAxesButton);
+            controlPanel.add(toggleGridButton);
+            controlPanel.add(sliderPanel);
+        
             add(drawingPanel, BorderLayout.CENTER);
             add(controlPanel, BorderLayout.SOUTH);
 
             timer = new Timer(50, e -> {
-                if (!isPaused && currentIndex < x.length) {
-                    trajectory.add(new Point3D(x[currentIndex], y[currentIndex], z[currentIndex]));
-                    currentIndex++;
+                if (!isPaused && currentIndex < getMinTrajectoryLength()) {
+                    int steps = Math.max(1, (int)(speedMultiplier));
+                    for(int step = 0; step < steps && currentIndex < getMinTrajectoryLength(); step++) {
+                        for (int i = 0; i < inputTrajectories.size(); i++) {
+                            ArrayList<double[]> currentTraj = inputTrajectories.get(i);
+                            trajectories.get(i).add(new Point3D(
+                                currentTraj.get(0)[currentIndex],
+                                currentTraj.get(1)[currentIndex],
+                                currentTraj.get(2)[currentIndex]
+                            ));
+                        }
+                        currentIndex++;
+                    }
                     drawingPanel.repaint();
                 }
             });
             timer.start();
         }
 
+        private int getMinTrajectoryLength() {
+            int minLength = Integer.MAX_VALUE;
+            for (ArrayList<double[]> traj : inputTrajectories) {
+                minLength = Math.min(minLength, traj.get(0).length);
+            }
+            return minLength;
+        }
+
         private void resetVisualization() {
             currentIndex = 0;
-            trajectory.clear();
+            for (ArrayList<Point3D> traj : trajectories) {
+                traj.clear();
+            }
             isPaused = false;
             drawingPanel.repaint();
         }
@@ -113,7 +181,6 @@ public class ODEVisualizer extends JFrame {
             drawingPanel.repaint();
         }
 
-        // Required mouse listener methods
         public void mouseReleased(MouseEvent e) { lastMousePos = null; }
         public void mouseClicked(MouseEvent e) {}
         public void mouseEntered(MouseEvent e) {}
@@ -147,29 +214,35 @@ public class ODEVisualizer extends JFrame {
 
             g2.translate(drawingPanel.getWidth()/2, drawingPanel.getHeight()/2);
 
-            // Draw coordinate system
-            drawGrid(g2);
+            if (showGrid) {
+                drawGrid(g2);
+            }
             
-            // Draw axes
-            drawAxis(g2, new Point3D(2, 0, 0), "X", Color.RED);
-            drawAxis(g2, new Point3D(0, 2, 0), "Y", Color.GREEN);
-            drawAxis(g2, new Point3D(0, 0, 2), "Z", Color.BLUE);
+            if (showAxes) {
+                drawAxis(g2, new Point3D(2, 0, 0), "X", Color.RED);
+                drawAxis(g2, new Point3D(0, 2, 0), "Y", Color.GREEN);
+                drawAxis(g2, new Point3D(0, 0, 2), "Z", Color.BLUE);
+            }
 
-            // Draw trajectory
-            if (trajectory.size() > 1) {
-                for (int i = 1; i < trajectory.size(); i++) {
-                    Point3D p1 = transform(trajectory.get(i-1));
-                    Point3D p2 = transform(trajectory.get(i));
+            for (int trajIdx = 0; trajIdx < trajectories.size(); trajIdx++) {
+                ArrayList<Point3D> trajectory = trajectories.get(trajIdx);
+                if (trajectory.size() > 1) {
+                    float hue = (float) trajIdx / trajectories.size();
                     
-                    float hue = (float)(i) / x.length;
+                    for (int i = 1; i < trajectory.size(); i++) {
+                        Point3D p1 = transform(trajectory.get(i-1));
+                        Point3D p2 = transform(trajectory.get(i));
+                        
+                        float brightness = 0.5f + ((float)i / trajectory.size()) * 0.5f;
+                        g2.setColor(Color.getHSBColor(hue, 1.0f, brightness));
+                        
+                        g2.draw(new Line2D.Double(p1.x, p1.y, p2.x, p2.y));
+                    }
+                    
+                    Point3D current = transform(trajectory.get(trajectory.size()-1));
                     g2.setColor(Color.getHSBColor(hue, 1.0f, 1.0f));
-                    
-                    g2.draw(new Line2D.Double(p1.x, p1.y, p2.x, p2.y));
+                    g2.fill(new Ellipse2D.Double(current.x-5, current.y-5, 10, 10));
                 }
-                
-                Point3D current = transform(trajectory.get(trajectory.size()-1));
-                g2.setColor(Color.RED);
-                g2.fill(new Ellipse2D.Double(current.x-5, current.y-5, 10, 10));
             }
         }
 
@@ -192,15 +265,6 @@ public class ODEVisualizer extends JFrame {
             g2.setColor(color);
             g2.draw(new Line2D.Double(origin.x, origin.y, p.x, p.y));
             g2.drawString(label, (float)p.x + 10, (float)p.y + 10);
-        }
-    }
-
-    public static class Point3D {
-        double x, y, z;
-        public Point3D(double x, double y, double z) {
-            this.x = x;
-            this.y = y;
-            this.z = z;
         }
     }
 }
