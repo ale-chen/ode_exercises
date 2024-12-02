@@ -91,6 +91,7 @@ public class Problems {
         double [] result = {k*x - a*x*y, b*x*y-l*y};
         return result;
     }
+
     public static double[][] Problem7_8(
         double sigma, double beta, double rho,
         double dt, double T,
@@ -143,6 +144,36 @@ public class Problems {
         return(result);
     }
 
+    public static double[][] Problem3_9(double x0, double v0, double mu, double dt, double T){
+        // Problem 3.9: Van der Pol Oscillator
+
+        // v' = mu(1-x^2)v - x
+        // x' = v
+
+        int steps = (int) (T/dt);
+
+        // Coordinates x,v
+        double[] x_seq = new double[steps+1];
+        double[] v_seq = new double[steps+1];
+
+        x_seq[0] = x0;
+        v_seq[0] = v0;
+        
+        for (int t = 1; t <= steps; t++) {
+            double[] f = f_vanderpol(x_seq[t-1], v_seq[t-1], mu);
+            x_seq[t] = x_seq[t-1] + dt*f[0];
+            v_seq[t] = v_seq[t-1] + dt*f[1];
+        }
+
+        double [][] result = {x_seq, v_seq};
+        return result;
+    }
+
+    public static double[] f_vanderpol(double x, double v, double mu) {
+        double [] result = {v,mu*(1-Math.pow(x,2))*v-x};
+        return result;
+    }
+
 
     public static void main(String[] args) {
         // Problem 1.10:
@@ -150,47 +181,77 @@ public class Problems {
         for(int k = 10; k <= 20; k++) {
             N[k-10] = (int) Math.pow(2, k);
         }
-        System.out.println(Problem1_10(N, "runge-kutta"));
+        System.out.println(Problem1_10(N, "midpoint"));
         
-        // Problem 2.8: Lotka-Volterra System
-        double k = 1.0, l = 1.0, a = 1.0, b = 1.0;  // parameters
-        double T = 20.0;  // time span
-        double x0 = 2.0, y0 = 2.0;  // single initial condition
+        // // Problem 2.8: Lotka-Volterra System
+        // double k = 1.0, l = 1.0, a = 1.0, b = 1.0;  // parameters
+        // double T = 20.0;  // time span
+        // double x0 = 2.0, y0 = 2.0;  // single initial condition
         
-        // Different step sizes to show numerical stability
-        double[] stepSizes = {0.1, 0.05, 0.01, 0.005, 0.001};
+        // // Different step sizes to show numerical stability
+        // double[] stepSizes = {0.1, 0.05, 0.01, 0.005, 0.001};
 
-        // Create collection of trajectories for visualization
-        ArrayList<ArrayList<double[]>> trajectories = new ArrayList<>();
+        // // Create collection of trajectories for visualization
+        // ArrayList<ArrayList<double[]>> trajectories = new ArrayList<>();
         
-        // Compute trajectories for all step sizes with both methods
-        for (double dt : stepSizes) {
-            // Euler method
-            double[][] eulerResult = Problem2_8(k, l, a, b, dt, T, x0, y0, "euler");
-            ArrayList<double[]> eulerTraj = new ArrayList<>();
-            eulerTraj.add(eulerResult[0]);  // x coordinates
-            eulerTraj.add(eulerResult[1]);  // y coordinates
-            eulerTraj.add(new double[eulerResult[0].length]);  // z = 0 for 2D
-            trajectories.add(eulerTraj);
+        // // Compute trajectories for all step sizes with both methods
+        // for (double dt : stepSizes) {
+        //     // Euler method
+        //     double[][] eulerResult = Problem2_8(k, l, a, b, dt, T, x0, y0, "euler");
+        //     ArrayList<double[]> eulerTraj = new ArrayList<>();
+        //     eulerTraj.add(eulerResult[0]);  // x coordinates
+        //     eulerTraj.add(eulerResult[1]);  // y coordinates
+        //     eulerTraj.add(new double[eulerResult[0].length]);  // z = 0 for 2D
+        //     trajectories.add(eulerTraj);
 
-            // Runge-Kutta method
-            double[][] rkResult = Problem2_8(k, l, a, b, dt, T, x0, y0, "runge-kutta");
-            ArrayList<double[]> rkTraj = new ArrayList<>();
-            rkTraj.add(rkResult[0]);
-            rkTraj.add(rkResult[1]);
-            rkTraj.add(new double[rkResult[0].length]);
-            trajectories.add(rkTraj);
-        }
+        //     // Runge-Kutta method
+        //     double[][] rkResult = Problem2_8(k, l, a, b, dt, T, x0, y0, "runge-kutta");
+        //     ArrayList<double[]> rkTraj = new ArrayList<>();
+        //     rkTraj.add(rkResult[0]);
+        //     rkTraj.add(rkResult[1]);
+        //     rkTraj.add(new double[rkResult[0].length]);
+        //     trajectories.add(rkTraj);
+        // }
 
-        // Visualize all trajectories
-        System.out.println("Lotka-Volterra Phase Space");
-        System.out.println("Initial condition: (x₀,y₀) = (2.0,2.0)");
-        System.out.println("Step sizes: 0.1, 0.05, 0.01, 0.005, 0.001");
-        System.out.println("Even indices: Euler method");
-        System.out.println("Odd indices: Runge-Kutta method");
-        MultiParticleVisualizer.visualize(trajectories);
+        // // Visualize all trajectories
+        // System.out.println("Lotka-Volterra Phase Space");
+        // System.out.println("Initial condition: (x₀,y₀) = (2.0,2.0)");
+        // System.out.println("Step sizes: 0.1, 0.05, 0.01, 0.005, 0.001");
+        // System.out.println("Even indices: Euler method");
+        // System.out.println("Odd indices: Runge-Kutta method");
+        // MultiParticleVisualizer.visualize(trajectories);
 
+        // // Problem 3.9: Van der Pol Oscillator
 
+        // // Van der Pol oscillator with different μ values
+        // double T = 50.0;  // longer time span to see limit cycles
+        // double dt = 0.001;
+        // double x0 = 1.0, v0 = 1.0;  // initial conditions
+        
+        // // Different μ values to compare
+        // double[] muValues = {0.1, 0.5, 1.0, 2.0, 4.0};
+        
+        // // Create collection of trajectories for visualization
+        // ArrayList<ArrayList<double[]>> trajectories = new ArrayList<>();
+        
+        // // Compute trajectories for different μ values
+        // for (double mu : muValues) {
+        //     double[][] result = Problem3_9(x0, v0, mu, dt, T);
+            
+        //     ArrayList<double[]> traj = new ArrayList<>();
+        //     traj.add(result[0]);  // x coordinates
+        //     traj.add(result[1]);  // v (dx/dt) coordinates
+        //     traj.add(new double[result[0].length]);  // z = 0 for 2D phase space
+        //     trajectories.add(traj);
+        // }
+
+        // // Visualize phase space
+        // System.out.println("Van der Pol Oscillator Phase Space");
+        // System.out.println("Initial condition: (x₀,v₀) = (1.0,1.0)");
+        // System.out.println("μ values: 0.1, 0.5, 1.0, 2.0, 4.0");
+        // System.out.println("Each color represents a different μ value");
+        // System.out.println("Observe how the limit cycle changes with μ");
+        // MultiParticleVisualizer.visualize(trajectories);
 
 
         // double[][] Lorenz = Problem7_8(
